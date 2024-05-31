@@ -1,1 +1,153 @@
+import streamlit as st
+import pandas as pd
+import plotly.express as px
+from sklearn.decomposition import PCA
+from sklearn.manifold import TSNE
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.cluster import KMeans, AgglomerativeClustering
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
+
+st.set_page_config(page_title="Data Analysis Application", layout="wide")
+
+# Define background styling
+def set_bg_hack_url():
+    st.markdown(
+        f"""
+         <style>
+         .stApp {{
+             background: url("https://www.transparenttextures.com/patterns/white-paper.png");
+             background-size: cover
+         }}
+         </style>
+         """,
+        unsafe_allow_html=True
+    )
+set_bg_hack_url()
+
+# Title and file uploader
+st.title("Data Analysis Application")
+uploaded_file = st.file_uploader("Upload CSV or Excel File", type=["csv", "xlsx"])
+
+# Load data function
+@st.cache
+def load_data(file):
+    ext = file.name.split('.')[-1]
+    if ext == 'csv':
+        return pd.read_csv(file)
+    elif ext == 'xlsx':
+        return pd.read_excel(file)
+
+# 2D Visualization function
+def plot_2d(data, method='PCA'):
+    df_numeric = data.select_dtypes(include='number')
+    if method == 'PCA':
+        pca = PCA(n_components=2)
+        components = pca.fit_transform(df_numeric)
+    elif method == 't-SNE':
+        tsne = TSNE(n_components=2)
+        components = tsne.fit_transform(df_numeric)
+    components_df = pd.DataFrame(components, columns=['Dim1', 'Dim2'])
+    components_df['label'] = data.iloc[:, -1]
+    return components_df
+
+# Histogram plot function
+def plot_histograms(data):
+    df_numeric = data.select_dtypes(include='number')
+    for column in df_numeric.columns:
+        fig = px.histogram(df_numeric, x=column, marginal='violin', title=f"Histogram for {column}")
+        st.plotly_chart(fig)
+
+# Boxplot plot function
+def plot_boxplots(data):
+    df_numeric = data.select_dtypes(include='number')
+    for column in df_numeric.columns:
+        fig = px.box(df_numeric, y=column, title=f"Boxplot for {column}")
+        st.plotly_chart(fig)
+
+# Classification function
+def classify(data, reg_param_lr, num_estimators_rf):
+    df_numeric = data.select_dtypes(include='number')
+    X = df_numeric.iloc[:, :-1]
+    y = df_numeric.iloc[:, -1]
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+    
+    lr = LogisticRegression(C=reg_param_lr, max_iter=1000)
+    rf = RandomForestClassifier(n_estimators=num_estimators_rf)
+    
+    lr.fit(X_train, y_train)
+    rf.fit(X_train, y_train)
+    
+    lr_pred = lr.predict(X_test)
+    rf_pred = rf.predict(X_test)
+    
+    return accuracy_score(y_test, lr_pred), accuracy_score(y_test, rf_pred)
+
+# Clustering function
+def cluster(data, num_clusters_km, num_clusters_hc):
+    df_numeric = data.select_dtypes(include='number')
+    kmeans = KMeans(n_clusters=num_clusters_km)
+    hc = AgglomerativeClustering(n_clusters=num_clusters_hc)
+    
+    kmeans_labels = kmeans.fit_predict(df_numeric)
+    hc_labels = hc.fit_predict(df_numeric)
+    
+    return kmeans_labels, hc_labels
+
+# Main section for data analysis
+if uploaded_file:
+    data = load_data(uploaded_file)
+    st.subheader("Exploratory Data Analysis")
+    st.dataframe(data)
+    
+    # 2D Visualization
+    st.subheader("2D Visualization")
+    method = st.radio("Select Visualization Algorithm", ["PCA", "t-SNE"])
+    plot_data = plot_2d(data, method)
+    fig = px.scatter(plot_data, x='Dim1', y='Dim2', color=plot_data.columns[-1])
+    st.plotly_chart(fig)
+    
+    # EDA Plot Type
+    eda_type = st.radio("Select EDA Plot Type", ["Histograms", "Boxplots"])
+    if eda_type == "Histograms":
+        plot_histograms(data)
+    elif eda_type == "Boxplots":
+        plot_boxplots(data)
+    
+    # Comparison section
+    st.subheader("Comparison")
+    reg_param_lr = st.slider("Regularization Parameter (C) for Logistic Regression", 0.01, 10.0, 1.0)
+    num_estimators_rf = st.slider("Number of Estimators for Random Forest", 1, 100, 10)
+    num_clusters_km = st.slider("Number of Clusters (k) for K-Means", 2, 10, 5)
+    num_clusters_hc = st.slider("Number of Clusters for Hierarchical Clustering", 2, 10, 5)
+    
+    # Classification Comparison
+    if st.button("Run Classification Comparison"):
+        lr_acc, rf_acc = classify(data, reg_param_lr, num_estimators_rf)
+        st.write(f"Logistic Regression Accuracy: {lr_acc}")
+        st.write(f"Random Forest Accuracy: {rf_acc}")
+    
+    # Clustering Comparison
+    if st.button("Run Clustering Comparison"):
+        km_labels, hc_labels = cluster(data, num_clusters_km, num_clusters_hc)
+        st.write(f"K-Means Labels: {km_labels}")
+        st.write(f"Hierarchical Clustering Labels: {hc_labels}")
+
+# Info section
+st.subheader("Info")
+st.write("""
+    This web application is designed for data mining and analysis. 
+    It allows users to upload data into a table, perform two-dimensional visualizations, 
+    conduct exploratory data analysis, and compare classification and clustering algorithms.
+""")
+st.write("""
+    ### Our Team
+    - Πέτρος Βεζυργιανόπουλος
+    - Άγγελος Τσάνη
+""")
+st.write("""
+    ### Tasks Being Executed
+    - 2D Visualization, Docker setup, Github version control, Machine learning algorithms comparison, 
+    Software release life cycle""")
 
